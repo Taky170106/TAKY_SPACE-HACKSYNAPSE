@@ -1,0 +1,14 @@
+# SignGuard AI — Layer 2 + Edge Node
+# FROZEN stack per CLAUDE.md §5
+
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6
+paho-mqtt>=2.0
+scikit-learn>=1.4
+shap>=0.45
+numpy>=1.26
+
+# dev / test
+pytest>=8.0
+httpx>=0.27          # FastAPI TestClient
