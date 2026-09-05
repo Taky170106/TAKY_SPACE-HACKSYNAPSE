@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.log
+.venv/
+venv/
+env/
+brag-output/
+data/*.db
+data/*.sqlite*
+*.img
+.DS_Store
+Thumbs.db
+# Real device configs with live Wi-Fi/broker secrets — never commit.
+usb_demo/esp8266/config.py
+usb_demo/esp32/config.py
+edge_node/hardware/esp32/config.py
