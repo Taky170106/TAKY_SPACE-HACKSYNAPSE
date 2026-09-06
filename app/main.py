@@ -333,10 +333,19 @@ async def ingest_usb(req: UsbIngestRequest) -> dict:
         payload = build_unprotected_payload(
             scenario, authentic_text=_demo["authorized_content"], attacker_text=req.content
         )
+        # SignGuard OFF: no verification -> push the ATTACKER'S content straight
+        # to the physical LCD so the sign is visibly hijacked (the money moment).
+        orch = _demo["orchestrator"]
+        hw_off = False
+        if orch is not None and _demo["broker"]:
+            a1, _, a2 = req.content.replace("\n", "|").partition("|")
+            orch.publish_command(req.device_id, "unverified",
+                                 line1=a1[:16], line2=a2[:16])
+            hw_off = True
         await manager.broadcast(payload)
         return {"device_id": req.device_id, "protected": False, "verified": None,
-                "decision": "displayed", "recommended_action": "render",
-                "risk": 0, "hardware_notified": False}
+                "decision": "displayed", "recommended_action": "unverified",
+                "risk": 0, "hardware_notified": hw_off}
 
     content_b64 = _b64.b64encode(req.content.encode("utf-8")).decode("ascii")
     events = [
