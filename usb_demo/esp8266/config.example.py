@@ -9,15 +9,36 @@
 #   D6 = GPIO12 -> Green LED +
 #   D7 = GPIO13 -> Red LED +
 
-WIFI_SSID = "your-wifi"
-WIFI_PASS = "your-password"
+# FLEXIBLE / DEMO-PROOF config. List every Wi-Fi you might use and every laptop
+# IP; the board scans and joins whatever is live. If none work it runs OFFLINE
+# DEMO mode and the onboard FLASH button (GPIO0) still drives LCD + buzzer.
 
-# LAN IP of the laptop running Mosquitto (find it with: ipconfig).
-BROKER_IP = "192.168.12.81"
+# (SSID, password) - only the ones actually in range are tried.
+WIFI_NETWORKS = [
+    ("your-wifi", "your-password"),
+    # ("Hotspot-2", "password-2"),
+]
+
+# Candidate broker IPs = your laptop's LAN IP on each network (ipconfig -> IPv4).
+BROKER_CANDIDATES = [
+    "192.168.12.81",
+    # "10.41.149.144",
+]
 BROKER_PORT = 1883
+
+# If True, when OFFLINE the board auto-cycles SECURE->TAMPER->... hands-free.
+AUTO_DEMO = False
+
+# Backwards-compatible single values (fallbacks; the lists above take priority).
+WIFI_SSID = WIFI_NETWORKS[0][0]
+WIFI_PASS = WIFI_NETWORKS[0][1]
+BROKER_IP = BROKER_CANDIDATES[0]
 
 DEVICE_ID = "SG-RNP-001"      # must match laptop/mqtt_config.py DEVICE_ID
 TOPIC_COMMANDS = "signguard/commands"
+
+# Onboard FLASH button (GPIO0 / D3) = manual demo trigger. Pressed = LOW.
+BUTTON_PIN = 0
 
 # --- I2C for the 16x2 LCD backpack (software I2C on ESP8266) ---
 I2C_SDA = 4     # D2

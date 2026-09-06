@@ -1,23 +1,31 @@
 """
 SignGuard AI - USB attack demo - NodeMCU ESP-12E (ESP8266) output node.
 
-MicroPython for ESP8266. No sensors - this board only reacts to what SignGuard
-(demo_trigger.py OR the Layer 2 brain) decides after the SHA-256 check. It
-subscribes to signguard/commands and shows the result physically:
+FLEXIBLE / DEMO-PROOF firmware. It never gets stuck and always demos:
 
-  render        -> LCD "SYSTEM SECURE"   / green LED on,  buzzer off
-  safe_fallback -> LCD "TAMPER DETECTED" / red LED blink, buzzer beeps
-  isolate       -> LCD "!! LOCKED !!"    / red LED solid, long beep (spare)
+  * Multi Wi-Fi + multi broker  : scans config.WIFI_NETWORKS / BROKER_CANDIDATES
+                                  and joins whatever is live. No single hardcoded
+                                  network. Keeps retrying in the background.
+  * OFFLINE DEMO mode           : if no network/broker, it does NOT freeze on
+                                  "WiFi..."; it shows OFFLINE READY and the FLASH
+                                  button still drives LCD + buzzer.
+  * FLASH button (GPIO0 / D3)   : press to cycle SECURE -> TAMPER (buzzer) ->
+                                  LOCKED -> SECURE, with zero laptop/network.
+  * Auto-reconnect              : the moment the broker is reachable it goes LIVE
+                                  and reacts to signguard/commands as before.
 
-Upload as main.py so it auto-runs on boot. Also upload: config.py (from
-config.example.py), lcd_api.py, i2c_lcd.py. Requires umqtt.simple.
+Commands (when LIVE):
+  render        -> LCD "SYSTEM SECURE" (or line1/line2) / green LED, buzzer off
+  safe_fallback -> LCD "TAMPER DETECTED" / red LED blink, pulsing buzzer
+  isolate       -> LCD "!! LOCKED !!"    / red LED solid, long beep
+  unverified    -> LCD attacker text     / no LEDs, no buzzer (SignGuard OFF)
+
+Upload as main.py. Also upload: config.py, lcd_api.py, i2c_lcd.py, umqtt.simple.
 
 WIRING (NodeMCU ESP-12E)   D-label -> GPIO
-------------------------------------------
-LCD (I2C backpack): VCC->3V3/VIN  GND->GND  SDA->D2(GPIO4)  SCL->D1(GPIO5)
-Buzzer:              +  ->D5(GPIO14)   -  ->GND
-Green LED:  D6(GPIO12) -> 220ohm -> LED(+) -> LED(-) -> GND
-Red LED:    D7(GPIO13) -> 220ohm -> LED(+) -> LED(-) -> GND
+LCD (I2C): VCC->3V3/VIN GND->GND SDA->D2(GPIO4) SCL->D1(GPIO5)
+Buzzer: + ->D5(GPIO14)  - ->GND   |  Green LED D6(GPIO12)  Red LED D7(GPIO13)
+FLASH button: onboard (GPIO0) - no wiring needed.
 """
 import time
 import json
@@ -28,8 +36,6 @@ from i2c_lcd import I2cLcd
 
 import config as cfg
 
-# ESP8266 has no hardware I2C peripheral id - use software I2C. Newer
-# MicroPython exposes SoftI2C; fall back to the legacy I2C on older builds.
 try:
     from machine import SoftI2C as _I2C
 except ImportError:
@@ -38,8 +44,7 @@ except ImportError:
 # --- Hardware setup ---------------------------------------------------
 i2c = _I2C(scl=Pin(cfg.I2C_SCL), sda=Pin(cfg.I2C_SDA), freq=100000)
 lcd = I2cLcd(i2c, cfg.LCD_ADDR, cfg.LCD_ROWS, cfg.LCD_COLS)
-# Buzzer driven with PWM (a real tone) so it sounds on BOTH active and passive
-# buzzers. duty 0 = silent, duty 700 = loud tone at ~2 kHz.
+# PWM buzzer => a real tone, works on BOTH active and passive buzzers.
 buzzer = PWM(Pin(cfg.BUZZER_PIN))
 buzzer.freq(2000)
 buzzer.duty(0)
@@ -47,23 +52,40 @@ led_green = Pin(cfg.LED_GREEN_PIN, Pin.OUT)
 led_red = Pin(cfg.LED_RED_PIN, Pin.OUT)
 led_green.value(0)
 led_red.value(0)
+button = Pin(cfg.BUTTON_PIN, Pin.IN, Pin.PULL_UP)   # pressed = 0
 
 
 def buz(on):
     buzzer.duty(700 if on else 0)
 
+
 STATES = {
     "render":        ("SYSTEM SECURE", "Content verified"),
     "safe_fallback": ("TAMPER DETECTED", "Update blocked"),
     "isolate":       ("!! LOCKED !!", "Maintenance req."),
-    # "unverified" = SignGuard OFF: the attacker's content is shown, no check.
-    # The LCD text is supplied by the command payload (line1/line2).
     "unverified":    ("SignGuard OFF", "unprotected"),
 }
+# order the FLASH button walks through
+BUTTON_CYCLE = ["render", "safe_fallback", "isolate"]
 
 mode = "render"
 mode_since = time.ticks_ms()
 cur_lines = STATES["render"]
+good_lines = STATES["render"]     # last VERIFIED content, used for fast fallback
+online = False
+client = None
+
+# Timing for the tamper alarm (ms)
+BUZZ_MS = 1200        # buzzer sounds for ~1.2 seconds
+TAMPER_SHOW_MS = 1500 # show "TAMPER DETECTED" briefly, then fall back to content
+
+# helper lists (support old single-value configs too)
+NETWORKS = getattr(cfg, "WIFI_NETWORKS", None) or [(cfg.WIFI_SSID, cfg.WIFI_PASS)]
+BROKERS = getattr(cfg, "BROKER_CANDIDATES", None) or [cfg.BROKER_IP]
+AUTO_DEMO = getattr(cfg, "AUTO_DEMO", False)
+
+wlan = network.WLAN(network.STA_IF)
+wlan.active(True)
 
 
 def lcd_show(line1, line2):
@@ -75,8 +97,11 @@ def lcd_show(line1, line2):
 
 
 def set_mode(m, l1=None, l2=None):
-    global mode, mode_since, cur_lines
+    global mode, mode_since, cur_lines, good_lines
     lines = (l1, l2 or "") if l1 is not None else STATES.get(m, ("SIGNGUARD", m))
+    # remember the last VERIFIED content so a tamper can fall back to it fast
+    if m == "render":
+        good_lines = lines
     if m != mode or lines != cur_lines:
         mode = m
         cur_lines = lines
@@ -105,65 +130,127 @@ def update_actuators():
         buz(False)
     elif mode == "safe_fallback":
         led_green.value(0)
-        blink = (t % 500) < 250
+        blink = (t % 400) < 200
         led_red.value(1 if blink else 0)
-        # pulsing beep (250 ms on / 250 ms off) for the whole tamper alarm,
-        # until a 'render' command clears it.
-        buz(blink)
+        buz(blink if t < BUZZ_MS else False)   # buzzer only for the first 1 s
+        if t > TAMPER_SHOW_MS:
+            # fast fallback: revert the sign to the last VERIFIED content
+            set_mode("render", good_lines[0], good_lines[1])
     elif mode == "isolate":
         led_green.value(0)
         led_red.value(1)
         buz((t % 1200) < 800)
     elif mode == "unverified":
-        # SignGuard OFF: no monitoring at all -> both LEDs dark, no buzzer,
-        # while the attacker's fake message sits on the sign.
         led_green.value(0)
         led_red.value(0)
         buz(False)
 
 
-def connect_wifi():
-    wlan = network.WLAN(network.STA_IF)
-    wlan.active(True)
-    if not wlan.isconnected():
-        lcd_show("SignGuard", "WiFi...")
-        wlan.connect(cfg.WIFI_SSID, cfg.WIFI_PASS)
-        while not wlan.isconnected():
-            time.sleep(0.5)
-    print("[esp8266] Wi-Fi:", wlan.ifconfig()[0])
+# --- Networking (non-blocking-ish, best effort) -----------------------
+def try_go_online():
+    """Scan known networks, join one, connect to a candidate broker.
+    Returns True only when MQTT is connected + subscribed."""
+    global client
+    try:
+        if not wlan.isconnected():
+            try:
+                visible = [n[0].decode("utf-8", "replace") for n in wlan.scan()]
+            except Exception:
+                visible = []
+            for ssid, pw in NETWORKS:
+                if ssid in visible:
+                    print("[esp8266] joining", ssid)
+                    wlan.connect(ssid, pw)
+                    for _ in range(16):          # wait up to ~8s
+                        if wlan.isconnected():
+                            break
+                        time.sleep(0.5)
+                if wlan.isconnected():
+                    break
+        if not wlan.isconnected():
+            return False
+        print("[esp8266] Wi-Fi:", wlan.ifconfig()[0])
+        for ip in BROKERS:
+            try:
+                c = MQTTClient(cfg.DEVICE_ID, ip, port=cfg.BROKER_PORT, keepalive=60)
+                c.set_callback(on_command)
+                c.connect()
+                c.subscribe(cfg.TOPIC_COMMANDS)
+                client = c
+                print("[esp8266] MQTT LIVE via", ip)
+                return True
+            except Exception as e:
+                print("[esp8266] broker", ip, "no:", e)
+        return False
+    except Exception as e:
+        print("[esp8266] net error:", e)
+        return False
 
 
-def connect_mqtt():
-    client = MQTTClient(cfg.DEVICE_ID, cfg.BROKER_IP,
-                        port=cfg.BROKER_PORT, keepalive=60)
-    client.set_callback(on_command)
-    client.connect()
-    client.subscribe(cfg.TOPIC_COMMANDS)
-    print("[esp8266] MQTT connected + subscribed:", cfg.BROKER_IP)
-    return client
+# --- Button (manual demo, works online or offline) --------------------
+_last_btn = 1
+_last_btn_ms = 0
+_btn_idx = 0
+
+
+def handle_button():
+    global _last_btn, _last_btn_ms, _btn_idx
+    v = button.value()
+    now = time.ticks_ms()
+    if v == 0 and _last_btn == 1 and time.ticks_diff(now, _last_btn_ms) > 250:
+        _last_btn_ms = now
+        _btn_idx = (_btn_idx + 1) % len(BUTTON_CYCLE)
+        set_mode(BUTTON_CYCLE[_btn_idx])
+        print("[esp8266] button ->", BUTTON_CYCLE[_btn_idx])
+    _last_btn = v
 
 
 def main():
+    global online
     lcd_show("SignGuard", "starting...")
-    connect_wifi()
-    client = connect_mqtt()
-    set_mode("render")     # default: secure, until an attack is triggered
-    print("[esp8266] ready. waiting for commands.")
+    # one quick attempt so we usually come up LIVE
+    online = try_go_online()
+    if online:
+        set_mode("render")
+        print("[esp8266] READY (LIVE). waiting for commands.")
+    else:
+        set_mode("render")
+        lcd_show("OFFLINE READY", "FLASH=demo")
+        print("[esp8266] READY (OFFLINE). FLASH button drives the demo.")
+
+    last_try = time.ticks_ms()
+    auto_last = time.ticks_ms()
+    auto_idx = 0
 
     while True:
-        try:
-            client.check_msg()   # non-blocking; triggers on_command on arrival
-            update_actuators()
-            time.sleep(0.02)
-        except OSError as e:
-            print("[esp8266] MQTT error, reconnecting:", e)
-            lcd_show("SignGuard", "reconnecting..")
-            time.sleep(2)
+        handle_button()
+
+        if online:
             try:
-                client = connect_mqtt()
-                lcd_show(cur_lines[0], cur_lines[1])
-            except Exception:
-                pass
+                client.check_msg()
+            except OSError as e:
+                print("[esp8266] MQTT lost:", e)
+                online = False
+                try:
+                    client.disconnect()
+                except Exception:
+                    pass
+        else:
+            # retry the network every ~10s WITHOUT blocking the demo
+            if time.ticks_diff(time.ticks_ms(), last_try) > 10000:
+                last_try = time.ticks_ms()
+                if try_go_online():
+                    online = True
+                    set_mode(mode)          # re-render current state on the LCD
+                    print("[esp8266] reconnected -> LIVE")
+            # optional hands-free demo when offline
+            if AUTO_DEMO and time.ticks_diff(time.ticks_ms(), auto_last) > 4000:
+                auto_last = time.ticks_ms()
+                auto_idx = (auto_idx + 1) % len(BUTTON_CYCLE)
+                set_mode(BUTTON_CYCLE[auto_idx])
+
+        update_actuators()
+        time.sleep(0.02)
 
 
 main()
