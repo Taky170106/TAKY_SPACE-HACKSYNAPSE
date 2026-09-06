@@ -1,0 +1,254 @@
+[
+  {
+    "device_id": "SG-RNP-001",
+    "event_type": "login_success",
+    "authorized": true,
+    "timestamp": "2026-08-21T10:05:02+00:00",
+    "data": {
+      "user": "operator"
+    }
+  },
+  {
+    "device_id": "SG-RNP-001",
+    "event_type": "usb_connected",
+    "authorized": true,
+    "timestamp": "2026-08-21T10:05:20+00:00",
+    "data": {
+      "serial": "MAINT-OK"
+    }
+  },
+  {
+    "device_id": "SG-RNP-001",
+    "event_type": "content_received",
+    "authorized": true,
+    "timestamp": "2026-08-21T10:05:25+00:00",
+    "data": {
+      "content_id": "baseline"
+    }
+  },
+  {
+    "device_id": "SG-RNP-001",
+    "event_type": "content_hash_match",
+    "authorized": true,
+    "timestamp": "2026-08-21T10:05:26+00:00",
+    "data": {}
+  },
+  {
+    "device_id": "SG-RNP-002",
+    "event_type": "login_success",
+    "authorized": true,
+    "timestamp": "2026-08-21T10:07:02+00:00",
+    "data": {
+      "user": "operator"
+    }
+  },
+  {
+    "device_id": "SG-RNP-002",
+    "event_type": "usb_connected",
+    "authorized": true,
+    "timestamp": "2026-08-21T10:07:20+00:00",
+    "data": {
+      "serial": "MAINT-OK"
+    }
+  },
+  {
+    "device_id": "SG-RNP-002",
+    "event_type": "content_received",
+    "authorized": true,
+    "timestamp": "2026-08-21T10:07:25+00:00",
+    "data": {
+      "content_id": "baseline"
+    }
+  },
+  {
+    "device_id": "SG-RNP-002",
+    "event_type": "content_hash_match",
+    "authorized": true,
+    "timestamp": "2026-08-21T10:07:26+00:00",
+    "data": {}
+  },
+  {
+    "device_id": "SG-RNP-003",
+    "event_type": "usb_connected",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:08:40+00:00",
+    "data": {
+      "serial": "UNKNOWN-USB"
+    }
+  },
+  {
+    "device_id": "SG-RNP-003",
+    "event_type": "unauthorized_usb",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:08:41+00:00",
+    "data": {
+      "serial": "UNKNOWN-USB"
+    }
+  },
+  {
+    "device_id": "SG-RNP-003",
+    "event_type": "content_received",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:09:55+00:00",
+    "data": {
+      "content_id": "baseline",
+      "source": "usb"
+    }
+  },
+  {
+    "device_id": "SG-RNP-003",
+    "event_type": "content_hash_mismatch",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:09:56+00:00",
+    "data": {}
+  },
+  {
+    "device_id": "SG-RNP-003",
+    "event_type": "unauthorized_usb",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:10:01+00:00",
+    "data": {
+      "serial": "UNKNOWN-USB"
+    }
+  },
+  {
+    "device_id": "SG-RNP-004",
+    "event_type": "wireless_activity",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:13:10+00:00",
+    "data": {
+      "ssid": "rogue-ap"
+    }
+  },
+  {
+    "device_id": "SG-RNP-004",
+    "event_type": "unauthorized_wireless",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:13:12+00:00",
+    "data": {
+      "ssid": "rogue-ap"
+    }
+  },
+  {
+    "device_id": "SG-RNP-004",
+    "event_type": "content_received",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:15:20+00:00",
+    "data": {
+      "content_id": "baseline",
+      "source": "wireless"
+    }
+  },
+  {
+    "device_id": "SG-RNP-004",
+    "event_type": "content_hash_mismatch",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:15:21+00:00",
+    "data": {}
+  },
+  {
+    "device_id": "SG-RNP-004",
+    "event_type": "unauthorized_wireless",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:15:25+00:00",
+    "data": {
+      "ssid": "rogue-ap"
+    }
+  },
+  {
+    "device_id": "SG-RNP-005",
+    "event_type": "login_failure",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:18:30+00:00",
+    "data": {
+      "user": "admin"
+    }
+  },
+  {
+    "device_id": "SG-RNP-005",
+    "event_type": "login_failure",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:18:45+00:00",
+    "data": {
+      "user": "admin"
+    }
+  },
+  {
+    "device_id": "SG-RNP-005",
+    "event_type": "default_credential_attempt",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:19:05+00:00",
+    "data": {
+      "user": "admin",
+      "password": "admin"
+    }
+  },
+  {
+    "device_id": "SG-RNP-005",
+    "event_type": "login_failure",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:19:30+00:00",
+    "data": {
+      "user": "root"
+    }
+  },
+  {
+    "device_id": "SG-RNP-005",
+    "event_type": "content_received",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:20:30+00:00",
+    "data": {
+      "content_id": "baseline",
+      "source": "admin_panel"
+    }
+  },
+  {
+    "device_id": "SG-RNP-005",
+    "event_type": "content_hash_mismatch",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:20:33+00:00",
+    "data": {}
+  },
+  {
+    "device_id": "SG-RNP-006",
+    "event_type": "unauthorized_usb",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:22:15+00:00",
+    "data": {
+      "serial": "EVIL-USB"
+    }
+  },
+  {
+    "device_id": "SG-RNP-006",
+    "event_type": "unauthorized_wireless",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:23:05+00:00",
+    "data": {
+      "ssid": "rogue-ap"
+    }
+  },
+  {
+    "device_id": "SG-RNP-006",
+    "event_type": "content_received",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:24:50+00:00",
+    "data": {
+      "content_id": "baseline",
+      "source": "usb"
+    }
+  },
+  {
+    "device_id": "SG-RNP-006",
+    "event_type": "content_hash_mismatch",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:24:52+00:00",
+    "data": {}
+  },
+  {
+    "device_id": "SG-RNP-006",
+    "event_type": "display_tamper",
+    "authorized": false,
+    "timestamp": "2026-08-21T10:25:05+00:00",
+    "data": {}
+  }
+]

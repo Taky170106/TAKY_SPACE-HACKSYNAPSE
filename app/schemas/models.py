@@ -42,6 +42,9 @@ class CommandType(str, Enum):
     render = "render"
     safe_fallback = "safe_fallback"
     isolate = "isolate"
+    # SignGuard OFF: unverified content is shown as-is (used to demo a hijack
+    # when protection is disabled — never emitted by the decision engine).
+    unverified = "unverified"
 
 
 class RiskLevel(str, Enum):
