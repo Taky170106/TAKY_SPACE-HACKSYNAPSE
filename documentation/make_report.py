@@ -490,7 +490,7 @@ def section_2() -> None:
           "Edge signage node: subscribes to commands, drives the indicators"],
          ["LCD display", "16 × 2 character LCD with I2C backpack (PCF8574)", "1",
           "Shows authorised text, tamper message or the safe fallback"],
-         ["LEDs (green, red)", "5 mm, 330 Ω series resistors", "2",
+         ["LEDs (green, red)", "5 mm, 220 Ω series resistors", "2",
           "Green = verified content rendered; Red = blocked / isolated"],
          ["Buzzer", "5 V passive buzzer", "1", "Audible alert on a blocked or isolated update"],
          ["Breadboard + jumpers", "400-point half-size", "1", "Indicator wiring"],
@@ -623,6 +623,32 @@ def section_3() -> None:
         "and the single threshold test at 50 decides between rendering and blocking, while the critical threshold at "
         "80 additionally isolates the update channel. Every terminal state writes an audit row and publishes exactly "
         "one MQTT command."
+    )
+    h3("Circuit view")
+    para(
+        "Figure 6 is the wiring of the edge node itself, and it is deliberately kept to five connections so that the "
+        "sign can be assembled on a breadboard in minutes. The 16x2 character display attaches through its I2C "
+        "backpack, which reduces the LCD's twelve parallel lines to two: serial data on D2 (GPIO4) and serial clock on "
+        "D1 (GPIO5), with the backpack responding at address 0x27. The backpack is powered from the board's 3V3 pin, "
+        "and the firmware initialises the bus in software, so no dedicated I2C peripheral is required. The buzzer "
+        "that sounds the tamper alarm sits on D5 (GPIO14) and is driven as a 2 kHz pulse-width-modulated tone rather "
+        "than a plain digital level, which means the same firmware works with either an active or a passive buzzer. "
+        "The two indicators share an identical branch: the green LED on D6 (GPIO12) and the red LED on D7 (GPIO13), "
+        "each through a 220 ohm series resistor to the common ground rail, so that a blocked update is visible from "
+        "across the platform even if the LCD is not readable. All grounds meet on one rail, and the only remaining "
+        "input is the onboard FLASH button on GPIO0, which requires no wiring and lets the alarm be demonstrated "
+        "without a laptop, a broker or a network."
+    )
+    figure("fig11_circuit.png",
+           "Figure 6: Circuit diagram of the edge node — NodeMCU ESP-12E with the I2C LCD, buzzer and LED pair.")
+    para(
+        "The alarm path over this wiring is end to end automatic. When a USB stick is inserted, the edge monitor "
+        "posts the content it carries to /ingest/usb; the SHA-256 digest of those bytes is compared with the "
+        "Ed25519-signed record in the ledger; a mismatch returns the safe-fallback verdict; and the orchestrator "
+        "publishes that command to signguard/commands. The firmware receives it, lights the red LED and drives D5 "
+        "for 1.2 seconds, after which the sign reverts to the last verified content. No operator confirms the "
+        "decision on the way, and the same wiring shows the secure state — green LED and authorised text — whenever "
+        "the digest matches."
     )
 
 
@@ -870,7 +896,7 @@ def section_4() -> None:
         size=8.2,
         caption="Table 7: Representative test cases (20 of 46) with inputs, expectations and observed results.",
     )
-    figure("fig10_tests.png", "Figure 10: Distribution of the 46 automated test cases across modules.")
+    figure("fig10_tests.png", "Figure 7: Distribution of the 46 automated test cases across modules.")
     para(
         "Coverage spans the two tracks independently (test_track_a, test_track_b), the fusion mathematics "
         "(test_scoring), the ledger (test_secure_chain), persistence (test_audit), the demo surfaces (test_demo) and "
@@ -917,7 +943,7 @@ def section_5() -> None:
         size=8.6,
         caption="Table 8: Measured end-to-end results for the four attack scenarios.",
     )
-    figure("fig6_risk.png", "Figure 6: Risk score of each scenario against the frozen level thresholds.")
+    figure("fig6_risk.png", "Figure 8: Risk score of each scenario against the frozen level thresholds.")
     figure("fig9_outcomes.png",
            "Figure 9: Verification outcome versus final decision — four scenarios, four correct verdicts.")
     para(
@@ -960,11 +986,11 @@ def section_5() -> None:
         caption="Table 9: Operational metrics of the implemented system.",
     )
     figure("fig7_latency.png",
-           "Figure 7: Measured decision latency — explainable inference dominates, transport is negligible.")
+           "Figure 10: Measured decision latency — explainable inference dominates, transport is negligible.")
 
     h2("5.3 Results in Tables and Graphs")
     para(
-        "Table 10 lists every decision together with the explanation the system attached to it, and Figure 8 plots "
+        "Table 10 lists every decision together with the explanation the system attached to it, and Figure 11 plots "
         "the SHAP decomposition for the highest-scoring attack. The tabulated values are the source of every graph in "
         "this section."
     )
@@ -986,7 +1012,7 @@ def section_5() -> None:
         caption="Table 10: Decision and dominant explanation factor per scenario.",
     )
     figure("fig8_shap.png",
-           "Figure 8: SHAP decomposition of the malicious-USB assessment (risk 71/100).")
+           "Figure 11: SHAP decomposition of the malicious-USB assessment (risk 71/100).")
     para(
         "The explanations are consistent with the threat model rather than merely numerically plausible: in the "
         "baseline it is the staleness of the last authorised update that pushes the assessment (impact +2.10) while "
@@ -1004,14 +1030,14 @@ def section_5() -> None:
          ["R2  Tampering is terminal", "decide() line 1 — gate precedes fusion",
           "Tests 2, 4, 7; Figure 5", "3/3 attacks blocked with reasons=hash_mismatch"],
          ["R3  Context-aware risk", "scoring module with frozen weights + isolation forest",
-          "Tests 6, 8, 9, 10; Figure 6", "Risk 1 (genuine) vs 62–71 (attacks)"],
+          "Tests 6, 8, 9, 10; Figure 8", "Risk 1 (genuine) vs 62–71 (attacks)"],
          ["R4  Explainable verdicts", "xai module (SHAP TreeExplainer) inside the decision object",
-          "Test 11; Figure 8; Table 10", "5 ranked, signed factors on every verdict"],
+          "Test 11; Figure 11; Table 10", "5 ranked, signed factors on every verdict"],
          ["R5  Non-repudiable audit", "SQLite audit store (file-backed) + ledger + /chain/verify",
           "Tests 12, 13, 14; Table 9", "168 rows persisted; verification survives restart"],
          ["R6  Real-time + physical enforcement",
           "run_analysis pipeline + MQTT orchestrator + ESP-12E node",
-          "Figure 7; Figures 3, 4", "21.7 ms processing; LCD/LED/buzzer command on :1883"],
+          "Figure 10; Figures 3, 4", "21.7 ms processing; LCD/LED/buzzer command on :1883"],
          ["Gap from Section 2.1 — verdict-bound explanation",
           "SHAP factors carried inside the Decision object",
           "Table 10", "Explanation travels with the command, not a separate report"],
@@ -1048,7 +1074,7 @@ def section_5() -> None:
         "server binds IPv4 only: each new connection therefore waits roughly two seconds before falling back to "
         "127.0.0.1. The processing path was never the slow part. The practical guidance recorded here is to address "
         "the service by an IPv4 literal (or to bind a dual-stack listener) and to measure a service under keep-alive, "
-        "otherwise a purely environmental artefact of 2 s is attributed to the decision engine — Figure 7 shows both "
+        "otherwise a purely environmental artefact of 2 s is attributed to the decision engine — Figure 10 shows both "
         "numbers side by side precisely so that the distinction is not lost."
     )
     h3("(d) Limitations")

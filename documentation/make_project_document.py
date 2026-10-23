@@ -400,13 +400,20 @@ def method():
     para(
         "A verdict that stays in a database is only an opinion. The decision is therefore published as an MQTT "
         "command, and the ESP-12E node maps the three command values onto the physical display: render shows the "
-        "authorised text with the green LED lit, safe fallback replaces it with a guarded message and lights the red "
-        "LED, and isolate additionally sounds the buzzer for 1.2 seconds and shows that updates are blocked. The "
-        "node keeps showing the last state it received, which is precisely the property that matters when the "
-        "management network drops during an incident. On the operator side the board watcher mirrors this in "
-        "software: when a serial device disappears it clears its cached device state, so a later insertion is "
-        "judged on fresh evidence rather than on a stale allow-list entry."
+        "authorised text with the green LED lit, safe fallback replaces it with a guarded message, blinks the red LED "
+        "and sounds the buzzer for 1.2 seconds before the sign reverts to the last verified content, and isolate "
+        "lights the red LED solidly with a repeating beep while showing that updates are blocked. The wiring that "
+        "carries these three indicators is shown in Figure 3 and is deliberately minimal: the 16x2 LCD reaches the "
+        "board over a two-wire I2C link on D2 and D1, the buzzer is driven from D5 as a pulse-width-modulated tone, "
+        "and the two LEDs sit on D6 and D7 behind 220 ohm resistors. The node keeps showing the last state it "
+        "received, which is precisely the property that matters when the management network drops during an "
+        "incident. On the operator side the board watcher mirrors this in software: when a serial device disappears "
+        "it clears its cached device state, so a later insertion is judged on fresh evidence rather than on a stale "
+        "allow-list entry."
     )
+    figure("fig11_circuit.png",
+           "Figure 3: Circuit diagram of the edge node. A tampered USB payload blocks server-side, and the "
+           "safe_fallback command drives the red LED and the buzzer on D5 automatically.", width=6.2)
 
 
 def experimentation():
@@ -474,11 +481,11 @@ def results():
         "and no false positive. The number worth staring at is not 71 but the column next to it: all three attacks "
         "report the same reason, hash mismatch, which is the fingerprint of the ordering described in Section 3.2. "
         "The fusion stage contributed risk points but did not decide anything, and had the forest been unavailable "
-        "at that moment the three payloads would still have been blocked. Figure 3 plots the risk scores against "
+        "at that moment the three payloads would still have been blocked. Figure 4 plots the risk scores against "
         "the frozen thresholds."
     )
     figure("fig6_risk.png",
-           "Figure 3: Risk score of each scenario measured against the frozen level thresholds. The genuine update "
+           "Figure 4: Risk score of each scenario measured against the frozen level thresholds. The genuine update "
            "sits far below the render threshold of 50; all three attacks sit above it.")
     para(
         "Latency was the part of the evaluation that taught us something we had not expected. Timing the pipeline "
@@ -490,12 +497,12 @@ def results():
         "connection took half a millisecond, and that the hostname localhost resolves to the IPv6 address ::1 on "
         "this host while the ASGI server binds IPv4 only. Each new connection was therefore waiting about two "
         "seconds before falling back. The processing path was never the slow part; an environmental artefact was "
-        "being attributed to our decision engine. Figure 4 shows both numbers side by side so that the distinction "
+        "being attributed to our decision engine. Figure 5 shows both numbers side by side so that the distinction "
         "is not lost, and the practical guidance we recorded from it is to address the service by an IPv4 literal "
         "or to bind a dual-stack listener."
     )
     figure("fig7_latency.png",
-           "Figure 4: Measured decision latency. Explainable inference dominates the pipeline, transport is "
+           "Figure 5: Measured decision latency. Explainable inference dominates the pipeline, transport is "
            "negligible, and the two second bar on the right is the name-resolution artefact discussed above.")
     para(
         "The explanations themselves were consistent in a way that we consider the strongest evidence for keeping "
@@ -506,10 +513,10 @@ def results():
         "the USB case, wireless anomaly at plus 2.5 for the rogue radio, and failed logins at plus 1.5 for the "
         "credential attack. An operator reading the third factor of any verdict can name the behaviour that caused "
         "it without opening a notebook, and because the ranking is stable across near-identical inputs there is no "
-        "reason to learn to ignore it. Figure 5 shows the decomposition for the highest scoring attack."
+        "reason to learn to ignore it. Figure 6 shows the decomposition for the highest scoring attack."
     )
     figure("fig8_shap.png",
-           "Figure 5: SHAP decomposition of the malicious USB assessment. The contribution of each of the seven "
+           "Figure 6: SHAP decomposition of the malicious USB assessment. The contribution of each of the seven "
            "features is signed, so the operator sees what raised the score and what held it down.")
     para(
         "Two limitations belong in this discussion rather than in a footnote. The MQTT broker is reachable on all "

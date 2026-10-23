@@ -13,6 +13,11 @@ The lab page (`/lab`) and dashboard send an MQTT command; the ESP reacts on the 
 - Breadboard + jumper wires
 
 ## 2. Wiring (GPIO numbers, not D-labels)
+
+![Circuit diagram — NodeMCU ESP-12E with LCD, buzzer and LEDs](documentation/figures/fig11_circuit.png)
+
+*Regenerate with `python documentation/make_circuit_diagram.py` (source of truth for every pin below).*
+
 | From ESP | Pin | To |
 |---|---|---|
 | LCD VCC | 3V3 / VIN(5V) | LCD power |
