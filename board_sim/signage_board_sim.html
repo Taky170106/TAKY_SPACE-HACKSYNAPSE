@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SignGuard — Hardware Attack Lab (Wi-Fi / USB / Admin + Ganache)</title>
+<style>
+:root{--bg:#06110c;--green:#1ee69c;--yel:#ffe03f;--red:#ff5a5a;--txt:#eafbf3;
+      --mute:#8fb7a6;--line:#1c5a41;--pi:#1b6e4b;--esp:#12447a;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:"Segoe UI",system-ui,sans-serif;padding:16px}
+h1{margin:0;font-size:21px;color:var(--green)}
+.sub{color:var(--mute);font-size:12.5px;margin:2px 0 12px}
+.wrap{display:grid;grid-template-columns:1.5fr 1fr;gap:16px}
+@media(max-width:1080px){.wrap{grid-template-columns:1fr}}
+.panel{background:#0a1c14;border:1px solid var(--line);border-radius:12px;padding:14px}
+.board{position:relative;height:560px;background:radial-gradient(circle at 40% 15%,#0f3325,#081b12 75%);
+   border:2px solid #14503a;border-radius:14px;overflow:hidden}
+.mod{position:absolute;border-radius:8px;border:2px solid var(--line);background:#0e2e21;
+   padding:7px 9px;font-size:10.5px;text-align:center;min-width:88px;transition:.2s}
+.mod b{display:block;font-size:11px;color:var(--txt)} .mod small{color:var(--mute);font-size:9px}
+.mod.surface{border-color:var(--red)} .mod.surface b{color:#ffb3b3}
+.mod.core{border-color:var(--green)} .mod.core b{color:var(--green)}
+.mod.pulse{transform:scale(1.07)} .mod.pulse.red{box-shadow:0 0 0 3px var(--red),0 0 16px var(--red)}
+.mod.pulse.grn{box-shadow:0 0 0 3px var(--green),0 0 16px var(--green)}
+.mod.pulse.yl{box-shadow:0 0 0 3px var(--yel),0 0 16px var(--yel)}
+/* sub-board frames */
+.frame{position:absolute;border:1.5px dashed #2a6b4e;border-radius:10px}
+.frame .flab{position:absolute;top:-9px;left:10px;background:#0a1c14;padding:0 6px;font-size:9.5px;color:var(--mute)}
+/* Raspberry Pi */
+.pi{background:linear-gradient(#12522f,#0d3a22)!important;border-color:#2ea06a!important}
+.pi b{color:#b6ffd9}
+.usbport{position:absolute;width:22px;height:14px;background:#888;border:1px solid #aaa;border-radius:2px}
+.pendrive{position:absolute;width:34px;height:14px;background:#c33;border:1px solid #f66;border-radius:3px;
+   font-size:8px;text-align:center;color:#fff;line-height:14px;transition:left .8s ease;z-index:12}
+/* ESP node + LCD */
+.esp{background:linear-gradient(#123f73,#0c2c52)!important;border-color:#3a7bd6!important}
+.esp b{color:#bcd8ff}
+.lcd{position:absolute;width:180px;height:80px;background:#062018;border:5px solid #0a3325;border-radius:7px;padding:8px}
+.lcd .scr{background:#0a3d2b;height:100%;border-radius:3px;display:flex;flex-direction:column;justify-content:center;
+   padding:6px;color:#8affc9;text-shadow:0 0 6px #1ee69c;font-family:Consolas,monospace;font-size:14px;line-height:1.35}
+.lcd.tamper .scr{background:#3a1414;color:#ff9a9a;text-shadow:0 0 6px #ff5a5a}
+.lcd .cap{position:absolute;top:-15px;left:4px;font-size:8.5px;color:var(--mute)}
+.led{position:absolute;width:15px;height:15px;border-radius:50%;border:1px solid #333;opacity:.25}
+.led.on{opacity:1}
+.led.g{background:#1ee69c;box-shadow:0 0 10px #1ee69c} .led.r{background:#ff5a5a;box-shadow:0 0 10px #ff5a5a}
+.buzz{position:absolute;width:26px;height:26px;border-radius:50%;background:#111;border:2px solid #444;
+   font-size:9px;color:#888;text-align:center;line-height:24px}
+.buzz.on{border-color:var(--yel);color:var(--yel);box-shadow:0 0 12px var(--yel);animation:bz .18s infinite}
+@keyframes bz{50%{box-shadow:0 0 3px var(--yel)}}
+/* gate */
+.gate{background:#0b3626!important;border-color:var(--green)!important}
+.gate b{color:var(--green)}
+.chainbadge{position:absolute;font-size:9px;color:var(--yel);border:1px solid var(--yel);border-radius:10px;padding:1px 6px}
+/* attacker + packet */
+.attacker{position:absolute;left:12px;top:8px;border:2px dashed var(--red);border-radius:8px;padding:5px 9px;
+   font-size:10.5px;color:#ffb3b3;background:rgba(60,20,20,.5)}
+.waves{position:absolute;color:var(--red);font-size:16px;opacity:0} .waves.on{opacity:1;animation:blink .5s infinite}
+@keyframes blink{50%{opacity:.3}}
+#packet{position:absolute;width:13px;height:13px;border-radius:50%;background:var(--red);
+   box-shadow:0 0 12px var(--red);opacity:0;z-index:20;transition:left .5s linear,top .5s linear}
+.wire{position:absolute;height:2px;background:var(--line);transform-origin:left center;z-index:1}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+button{font:inherit;font-size:12.5px;padding:8px 12px;border-radius:8px;border:2px solid var(--line);
+   background:#0e2e21;color:var(--txt);cursor:pointer;font-weight:600}
+button:hover{border-color:var(--green)} button.atk{border-color:var(--red);color:#ffb3b3}
+button.atk:hover{background:#2a1010}
+.toggle{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12.5px}
+.sw{width:54px;height:26px;border-radius:20px;background:#3a1414;border:1px solid var(--red);position:relative;cursor:pointer;transition:.2s}
+.sw.on{background:#0a3d2b;border-color:var(--green)}
+.sw i{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#ff9a9a;transition:.2s}
+.sw.on i{left:31px;background:var(--green)}
+.badge{display:inline-block;padding:4px 10px;border-radius:6px;border:2px solid var(--green);color:var(--green);font-weight:700;font-size:12px}
+.badge.bad{border-color:var(--red);color:var(--red)}
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.tab{padding:6px 11px;border-radius:8px 8px 0 0;background:#0a1c14;border:1px solid var(--line);border-bottom:none;cursor:pointer;font-size:12px;color:var(--mute)}
+.tab.act{color:var(--green);border-color:var(--green)}
+.tabc{display:none} .tabc.act{display:block}
+pre{margin:0;background:#0a0f0c;border:1px solid var(--line);border-radius:8px;padding:11px;font-family:Consolas,monospace;font-size:11.5px;line-height:1.5;overflow:auto;max-height:330px}
+.cl{color:#5c7a6c}.kw{color:#6fb3ff}.st{color:#9fe7c8}
+.vuln{background:rgba(255,90,90,.18);display:block;border-left:3px solid var(--red);padding-left:6px}
+.fix{background:rgba(30,230,156,.15);display:block;border-left:3px solid var(--green);padding-left:6px}
+.log{font-family:Consolas,monospace;font-size:11.5px;background:#0a0f0c;border:1px solid var(--line);border-radius:8px;padding:10px;height:330px;overflow:auto}
+.log div{margin:2px 0}.log .a{color:var(--red)}.log .g{color:var(--green)}.log .m{color:var(--mute)}.log .y{color:var(--yel)}.log .b{color:#6fb3ff}
+table{width:100%;border-collapse:collapse;font-size:11.5px}
+th,td{border:1px solid var(--line);padding:5px 7px;text-align:left;vertical-align:top}
+th{background:#0e2e21;color:var(--green)} td .vid{color:var(--red);font-weight:700}
+</style></head>
+<body>
+<h1>SignGuard — Hardware Attack Lab</h1>
+<div class="sub">The real components we built: Raspberry Pi (edge/USB detector) → Signage Controller → SignGuard gate (SHA-256 + on-chain verify via Ganache) → ESP-12E signage node (16×2 LCD + buzzer + LEDs). Standalone simulator — production system unchanged.</div>
+
+<div class="wrap">
+ <div class="panel">
+  <div class="board" id="board">
+    <div class="attacker" id="attacker">🖥️ Attacker<br><small>rogue laptop / AP / USB</small></div>
+    <div class="waves" id="waves" style="left:110px;top:22px">))) )))</div>
+
+    <!-- EDGE: Raspberry Pi -->
+    <div class="frame" style="left:8px;top:150px;width:210px;height:170px"><span class="flab">EDGE NODE</span></div>
+    <div class="mod pi" id="c_pi" style="left:40px;top:210px"><b>Raspberry Pi</b><small>USB detector (pyudev)</small></div>
+    <div class="usbport" id="usbport" style="left:150px;top:224px"></div>
+    <div class="pendrive" id="pendrive" style="left:250px;top:224px;opacity:0">USB</div>
+
+    <!-- CONTROLLER -->
+    <div class="frame" style="left:235px;top:60px;width:190px;height:300px"><span class="flab">SIGNAGE CONTROLLER</span></div>
+    <div class="mod surface" id="c_wifi" style="left:255px;top:80px">📶<b>Wi-Fi Module</b><small>update radio</small></div>
+    <div class="mod surface" id="c_adm" style="left:255px;top:280px">🔑<b>Admin / UART</b><small>console</small></div>
+    <div class="mod core" id="c_soc" style="left:270px;top:180px">🧠<b>SoC / CPU</b><small>firmware</small></div>
+
+    <!-- GATE -->
+    <div class="mod gate" id="c_gate" style="left:455px;top:175px">🛡️<b>SignGuard</b><small>SHA-256 gate</small></div>
+    <div class="chainbadge" id="chainb" style="left:452px;top:150px;opacity:.4">⛓ Ganache on-chain</div>
+
+    <!-- ESP-12E signage node -->
+    <div class="frame" style="left:600px;top:70px;width:270px;height:320px"><span class="flab">ESP-12E SIGNAGE NODE</span></div>
+    <div class="mod esp" id="c_esp" style="left:620px;top:95px">📡<b>ESP-12E</b><small>ESP8266 MCU</small></div>
+    <div class="lcd" id="lcd" style="left:620px;top:170px"><div class="cap">16×2 LCD</div>
+       <div class="scr" id="scr">TNSTC Route 101<br>Next bus 10:30</div></div>
+    <div class="buzz" id="buzz" style="left:620px;top:300px">BUZ</div>
+    <div class="led g" id="ledG" style="left:700px;top:305px"></div>
+    <div class="led r" id="ledR" style="left:730px;top:305px"></div>
+    <div style="position:absolute;left:670px;top:325px;font-size:8.5px;color:var(--mute)">grn / red LED</div>
+
+    <div id="packet"></div>
+  </div>
+
+  <div class="controls">
+    <button class="atk" onclick="wifiAttack()">📶 Wi-Fi Attack</button>
+    <button class="atk" onclick="usbAttack()">🔌 USB Attack</button>
+    <button class="atk" onclick="adminAttack()">🔑 Admin Attack</button>
+    <button onclick="genuine()">✔ Genuine Update</button>
+    <button onclick="testBeep()">🔊 Test Beep</button>
+    <button onclick="resetBoard()">Reset</button>
+    <div class="toggle">SignGuard
+      <div class="sw" id="sw" onclick="toggleSG()"><i></i></div>
+      <span id="swlbl" style="color:var(--red);font-weight:700">OFF</span></div>
+  </div>
+  <div id="verdict" class="badge bad">SignGuard OFF — controller trusts any update</div>
+ </div>
+
+ <div class="panel">
+  <div class="tabs">
+    <div class="tab act" onclick="tab('code')">Firmware Code</div>
+    <div class="tab" onclick="tab('threat')">Threat Model</div>
+    <div class="tab" onclick="tab('log')">Attack Log</div>
+  </div>
+  <div id="t_code" class="tabc act">
+    <div style="font-size:12px;color:var(--mute);margin-bottom:6px">Handler on the controller. Toggle SignGuard to switch versions.</div>
+    <pre id="codeVuln"><span class="cl"># VULNERABLE — trusts any update path (Wi-Fi/USB/Admin)</span>
+<span class="kw">def</span> on_update(src, content):
+<span class="vuln">    display.render(content)     # NO check — whatever arrives is shown</span>
+    log(<span class="st">"applied from "</span>+src)</pre>
+    <pre id="codeFix" style="display:none"><span class="cl"># SignGuard — SHA-256 + on-chain (Ganache) verify before the screen</span>
+<span class="kw">def</span> on_update(src, content):
+    digest = sha256(content)
+<span class="fix">    if not registry.verify(content_id, digest):   # SignageRegistry.sol on Ganache</span>
+<span class="fix">        display.safe_fallback(); buzzer.alarm(); return</span>
+    display.render(content)     <span class="cl"># only authority-signed content passes</span></pre>
+    <div style="font-size:11.5px;color:var(--mute);margin-top:8px" id="codeWhy"></div>
+  </div>
+  <div id="t_threat" class="tabc">
+    <table>
+      <tr><th>ID</th><th>Entry (component)</th><th>How the attack works</th></tr>
+      <tr><td class="vid">V1/V6</td><td>Wi-Fi Module</td><td>Join/rogue-AP the update network, inject or replay a CONTENT_UPDATE packet</td></tr>
+      <tr><td class="vid">V1</td><td>Raspberry Pi USB</td><td>Insert a pendrive with tampered signage.txt; the Pi auto-reads &amp; forwards it</td></tr>
+      <tr><td class="vid">V4</td><td>Admin / UART</td><td>Log in with default/weak credentials and push content</td></tr>
+      <tr><td class="vid">V2/V3</td><td>SoC firmware</td><td>Trusts the channel, no integrity gate before the display</td></tr>
+    </table>
+    <div style="font-size:12px;color:var(--mute);margin-top:10px"><b style="color:var(--yel)">Assumption:</b> the attacker can reach any entry point but does NOT hold the authority's private key, so they cannot forge a valid on-chain hash.</div>
+  </div>
+  <div id="t_log" class="tabc"><div class="log" id="log"><div class="m">// idle</div></div></div>
+ </div>
+</div>
+
+<script>
+const AUTH={l1:"TNSTC Route 101",l2:"Next bus 10:30"};
+const FAKE={l1:"PLATFORM CHANGED",l2:"Board Track 9 NOW"};
+let SG=false;
+function tab(n){document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('act',['code','threat','log'][i]===n));
+  document.getElementById('t_code').classList.toggle('act',n==='code');
+  document.getElementById('t_threat').classList.toggle('act',n==='threat');
+  document.getElementById('t_log').classList.toggle('act',n==='log');}
+function logln(t,c){const l=document.getElementById('log');const d=document.createElement('div');if(c)d.className=c;d.textContent=t;l.appendChild(d);l.scrollTop=l.scrollHeight;}
+function setLCD(a,b,t){document.getElementById('scr').innerHTML=a+"<br>"+b;document.getElementById('lcd').classList.toggle('tamper',!!t);}
+function pulse(id,c){const e=document.getElementById(id);e.classList.add('pulse',c);setTimeout(()=>e.classList.remove('pulse',c),600);}
+function led(g,r){document.getElementById('ledG').classList.toggle('on',g);document.getElementById('ledR').classList.toggle('on',r);}
+let _actx=null,_osc=null;
+function unlockAudio(){try{if(!_actx)_actx=new (window.AudioContext||window.webkitAudioContext)();
+  if(_actx.state==='suspended')_actx.resume();}catch(e){}}
+function beep(on){
+  try{
+    if(on){
+      unlockAudio(); if(_osc)return;
+      _osc=_actx.createOscillator();const g=_actx.createGain();
+      _osc.type='square';_osc.frequency.value=2000;g.gain.value=0.25;
+      _osc.connect(g);g.connect(_actx.destination);_osc.start();_osc._g=g;
+    }else if(_osc){try{_osc.stop();_osc.disconnect();}catch(e){}_osc=null;}
+  }catch(e){}
+}
+function buzz(on){document.getElementById('buzz').classList.toggle('on',on);beep(on);}
+function testBeep(){unlockAudio();buzz(true);setTimeout(()=>buzz(false),900);}
+function center(id){const b=document.getElementById('board').getBoundingClientRect();const r=document.getElementById(id).getBoundingClientRect();
+  return{x:r.left-b.left+r.width/2-6,y:r.top-b.top+r.height/2-6};}
+function move(id){return new Promise(res=>{const p=document.getElementById('packet');const c=center(id);p.style.opacity=1;p.style.left=c.x+'px';p.style.top=c.y+'px';setTimeout(res,520);});}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function toggleSG(){SG=!SG;document.getElementById('sw').classList.toggle('on',SG);
+  const l=document.getElementById('swlbl');l.textContent=SG?'ON':'OFF';l.style.color=SG?'var(--green)':'var(--red)';
+  document.getElementById('codeVuln').style.display=SG?'none':'block';
+  document.getElementById('codeFix').style.display=SG?'block':'none';
+  document.getElementById('chainb').style.opacity=SG?'1':'0.4';
+  const v=document.getElementById('verdict');
+  v.textContent=SG?'SignGuard ON — SHA-256 + Ganache on-chain verify':'SignGuard OFF — controller trusts any update';
+  v.className='badge'+(SG?'':' bad');
+  document.getElementById('codeWhy').innerHTML=SG
+    ?"<b style='color:var(--green)'>Safe:</b> the controller hashes the content and calls SignageRegistry.verify() on Ganache. Attacker controls the bytes, not the signed on-chain hash — mismatch is blocked before the LCD."
+    :"<b style='color:var(--red)'>Vulnerable:</b> content from ANY path goes straight to display.render() with no check (V2/V3).";}
+function resetBoard(){setLCD(AUTH.l1,AUTH.l2,false);led(true,false);buzz(false);
+  document.getElementById('packet').style.opacity=0;document.getElementById('waves').classList.remove('on');
+  document.getElementById('pendrive').style.opacity=0;document.getElementById('pendrive').style.left='250px';
+  logln('// reset — authorised content on the LCD, green LED','m');}
+
+async function gate(fake,srcline){
+  pulse('c_gate',SG?'grn':'red'); await move('c_gate');
+  if(SG){
+    logln('   SignGuard: sha256(content) -> SignageRegistry.verify() on Ganache','b');
+    logln('   on-chain result: MISMATCH  ✘  -> BLOCK','y');
+    pulse('c_esp','grn');await move('c_esp');
+    setLCD('TAMPER DETECTED','Update blocked',true);led(false,true);buzz(true);
+    logln('   ESP-12E: red LED + buzzer alarm','g');
+    document.getElementById('packet').style.opacity=0;
+    await sleep(1400);buzz(false);setLCD(AUTH.l1,AUTH.l2,false);led(true,false);
+    logln('   LCD reverted to authorised content. ATTACK DEFEATED.','g');
+  }else{
+    pulse('c_esp','red');await move('c_esp');
+    setLCD(fake.l1,fake.l2,true);led(false,false);buzz(false);
+    document.getElementById('packet').style.opacity=0;
+    logln('   ESP-12E LCD ← attacker content. SIGN HIJACKED.','a');
+  }
+}
+async function toSoC(fromId){pulse(fromId,'red');await move(fromId);
+  logln('   controller firmware on_update() runs on the SoC','a');pulse('c_soc','red');await move('c_soc');}
+
+async function wifiAttack(){unlockAudio();logln('════ Wi-Fi ATTACK ════','a');
+  logln('1) attacker joins/rogues update network, injects CONTENT_UPDATE packet','a');
+  document.getElementById('waves').classList.add('on');
+  const p=document.getElementById('packet'),a=center('attacker');p.style.transition='none';p.style.left=a.x+'px';p.style.top=a.y+'px';p.style.opacity=1;await sleep(60);p.style.transition='';
+  logln('2) packet reaches the Wi-Fi module','a');await toSoC('c_wifi');
+  await gate(FAKE);document.getElementById('waves').classList.remove('on');}
+
+async function usbAttack(){unlockAudio();logln('════ USB ATTACK (via Raspberry Pi) ════','a');
+  logln('1) attacker writes tampered signage.txt to a USB pendrive','a');
+  const pd=document.getElementById('pendrive');pd.style.opacity=1;pd.style.left='250px';await sleep(100);
+  logln('2) pendrive inserted into the Raspberry Pi USB port','a');pd.style.left='168px';await sleep(850);
+  logln('3) Pi (pyudev) auto-mounts, reads + hashes the file, forwards it','a');pulse('c_pi','red');
+  const p=document.getElementById('packet'),c=center('c_pi');p.style.transition='none';p.style.left=c.x+'px';p.style.top=c.y+'px';p.style.opacity=1;await sleep(60);p.style.transition='';
+  await move('c_soc');logln('   controller firmware on_update() runs on the SoC','a');pulse('c_soc','red');
+  await gate(FAKE);}
+
+async function adminAttack(){unlockAudio();logln('════ ADMIN-PANEL ATTACK ════','a');
+  logln('1) attacker logs in via Admin/UART using default credentials (admin/admin)','a');
+  const p=document.getElementById('packet'),a=center('attacker');p.style.transition='none';p.style.left=a.x+'px';p.style.top=a.y+'px';p.style.opacity=1;await sleep(60);p.style.transition='';
+  logln('2) pushes content through the admin console','a');await toSoC('c_adm');
+  await gate(FAKE);}
+
+async function genuine(){unlockAudio();logln('▶ genuine authorised update','g');
+  document.getElementById('waves').classList.add('on');pulse('c_wifi','grn');await move('c_wifi');
+  pulse('c_soc','grn');await move('c_soc');pulse('c_gate','grn');await move('c_gate');
+  if(SG)logln('   SignageRegistry.verify() on Ganache: MATCH ✔','g');
+  pulse('c_esp','grn');await move('c_esp');setLCD(AUTH.l1,AUTH.l2,false);led(true,false);buzz(false);
+  document.getElementById('packet').style.opacity=0;document.getElementById('waves').classList.remove('on');
+  logln('   LCD ← authorised content, green LED','g');}
+
+window.addEventListener('load',()=>{const b=document.getElementById('board');
+  function wire(a,c){const p=center(a),q=center(c),dx=q.x-p.x,dy=q.y-p.y,len=Math.hypot(dx,dy),ang=Math.atan2(dy,dx)*180/Math.PI;
+    const w=document.createElement('div');w.className='wire';w.style.left=(p.x+6)+'px';w.style.top=(p.y+6)+'px';w.style.width=len+'px';w.style.transform='rotate('+ang+'deg)';b.appendChild(w);}
+  wire('c_pi','c_soc');wire('c_wifi','c_soc');wire('c_adm','c_soc');wire('c_soc','c_gate');wire('c_gate','c_esp');
+  resetBoard();document.getElementById('log').innerHTML='<div class="m">// ready — pick an attack (Wi-Fi / USB / Admin), toggle SignGuard to compare</div>';});
+</script>
+</body></html>

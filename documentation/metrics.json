@@ -1,0 +1,238 @@
+{
+  "generated_at": "2026-10-11T07:53:46+00:00",
+  "pipeline_latency_ms": {
+    "baseline": {
+      "mean": 21.708,
+      "median": 21.645,
+      "p95": 22.339,
+      "min": 21.042,
+      "max": 22.62,
+      "n": 40
+    },
+    "usb": {
+      "mean": 21.927,
+      "median": 21.791,
+      "p95": 22.715,
+      "min": 21.12,
+      "max": 25.459,
+      "n": 40
+    },
+    "wireless": {
+      "mean": 22.201,
+      "median": 22.26,
+      "p95": 23.403,
+      "min": 20.935,
+      "max": 23.794,
+      "n": 40
+    },
+    "credential": {
+      "mean": 21.939,
+      "median": 21.717,
+      "p95": 23.36,
+      "min": 21.018,
+      "max": 23.652,
+      "n": 40
+    }
+  },
+  "http_latency_ms": {
+    "analyze_keepalive_ipv4": {
+      "mean": 3.305,
+      "median": 3.222,
+      "p95": 3.544,
+      "min": 2.795,
+      "max": 7.407,
+      "n": 50
+    },
+    "analyze_fresh_ipv4": {
+      "mean": 11.794,
+      "median": 11.728,
+      "p95": 24.137,
+      "min": 3.614,
+      "max": 28.724,
+      "n": 15
+    },
+    "analyze_fresh_localhost": {
+      "mean": 2040.498,
+      "median": 2040.277,
+      "p95": 2055.333,
+      "min": 2021.684,
+      "max": 2056.61,
+      "n": 15
+    },
+    "health_fresh_localhost": {
+      "mean": 2040.569,
+      "median": 2040.15,
+      "p95": 2043.143,
+      "min": 2033.227,
+      "max": 2053.809,
+      "n": 10
+    }
+  },
+  "scenarios": [
+    {
+      "id": "baseline",
+      "title": "Baseline \u2014 authorized content",
+      "decision": "render",
+      "command": "render",
+      "risk": 1,
+      "level": "low",
+      "reasons": [
+        "hash_match",
+        "risk_acceptable"
+      ],
+      "verified_match": true,
+      "hash_action": "render",
+      "shap": [
+        {
+          "name": "time_since_authorized_update",
+          "impact": 2.096
+        },
+        {
+          "name": "events_per_minute",
+          "impact": -0.435
+        },
+        {
+          "name": "device_trust_score",
+          "impact": -0.306
+        },
+        {
+          "name": "failed_logins_5min",
+          "impact": -0.289
+        },
+        {
+          "name": "wireless_anomaly",
+          "impact": -0.083
+        }
+      ],
+      "events": [
+        "content_hash_match",
+        "content_received",
+        "login_success"
+      ]
+    },
+    {
+      "id": "usb",
+      "title": "Malicious USB / content replacement",
+      "decision": "block",
+      "command": "safe_fallback",
+      "risk": 71,
+      "level": "high",
+      "reasons": [
+        "hash_mismatch"
+      ],
+      "verified_match": false,
+      "hash_action": "block",
+      "shap": [
+        {
+          "name": "device_trust_score",
+          "impact": 3.671
+        },
+        {
+          "name": "unknown_usb_detected",
+          "impact": 2.222
+        },
+        {
+          "name": "content_hash_mismatch",
+          "impact": 1.92
+        },
+        {
+          "name": "time_since_authorized_update",
+          "impact": 0.865
+        },
+        {
+          "name": "events_per_minute",
+          "impact": -0.24
+        }
+      ],
+      "events": [
+        "content_hash_mismatch",
+        "content_received",
+        "unauthorized_usb"
+      ]
+    },
+    {
+      "id": "wireless",
+      "title": "Unauthorized wireless update",
+      "decision": "block",
+      "command": "safe_fallback",
+      "risk": 62,
+      "level": "high",
+      "reasons": [
+        "hash_mismatch"
+      ],
+      "verified_match": false,
+      "hash_action": "block",
+      "shap": [
+        {
+          "name": "device_trust_score",
+          "impact": 3.248
+        },
+        {
+          "name": "wireless_anomaly",
+          "impact": 2.511
+        },
+        {
+          "name": "content_hash_mismatch",
+          "impact": 2.054
+        },
+        {
+          "name": "time_since_authorized_update",
+          "impact": 0.88
+        },
+        {
+          "name": "events_per_minute",
+          "impact": -0.245
+        }
+      ],
+      "events": [
+        "content_hash_mismatch",
+        "content_received",
+        "unauthorized_wireless",
+        "wireless_activity"
+      ]
+    },
+    {
+      "id": "credential",
+      "title": "Compromised admin credentials",
+      "decision": "block",
+      "command": "safe_fallback",
+      "risk": 66,
+      "level": "high",
+      "reasons": [
+        "hash_mismatch"
+      ],
+      "verified_match": false,
+      "hash_action": "block",
+      "shap": [
+        {
+          "name": "device_trust_score",
+          "impact": 3.459
+        },
+        {
+          "name": "content_hash_mismatch",
+          "impact": 2.192
+        },
+        {
+          "name": "failed_logins_5min",
+          "impact": 1.517
+        },
+        {
+          "name": "time_since_authorized_update",
+          "impact": 0.951
+        },
+        {
+          "name": "events_per_minute",
+          "impact": 0.169
+        }
+      ],
+      "events": [
+        "content_hash_mismatch",
+        "content_received",
+        "default_credential_attempt",
+        "login_failure",
+        "login_success"
+      ]
+    }
+  ],
+  "audit_rows": 168
+}

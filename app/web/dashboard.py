@@ -191,7 +191,7 @@ _HTML = r"""<!doctype html>
       <a class="act">Console</a><a>Incidents</a><a>Devices</a><a>Audit</a><a>Docs</a>
     </div>
     <div class="navright">
-      <div class="chip"><span id="chainDot" class="d"></span><span id="chainLbl">on-chain…</span></div>
+      <a class="chip" href="/chain/view" target="_blank" title="View the signed, hash-linked ledger" style="text-decoration:none;color:inherit;cursor:pointer"><span id="chainDot" class="d"></span><span id="chainLbl">on-chain…</span></a>
       <div class="chip"><span id="ledBroker" class="d"></span><span id="brokerLbl">connecting…</span></div>
       <span class="ghost">Sign in</span>
     </div>

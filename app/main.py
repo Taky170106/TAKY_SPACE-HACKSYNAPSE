@@ -36,7 +36,7 @@ from app.fallback import safe_fallback_content
 from app.orchestrator import Orchestrator, _authorize_baseline
 from app.pipeline import run_analysis
 from app.schemas import AnalyzeRequest, AnalyzeResponse, ContentUpdate, EventType, SecurityEvent
-from app.web import dashboard, lab, signage
+from app.web import chain_view, dashboard, lab, signage
 from app.web.live import (
     ConnectionManager,
     build_decision_payload,
@@ -91,6 +91,11 @@ def _on_analysis(device_id: str, result: AnalyzeResponse) -> None:
 async def _start_orchestrator() -> None:
     _demo["loop"] = asyncio.get_running_loop()
     _authorize_baseline()
+    if os.environ.get("SIGNGUARD_DISABLE_MQTT") == "1":
+        # Serverless / API-only deploys have no broker to reach; skipping the
+        # retry loop keeps the cold start short instead of burning ~5 s on it.
+        print("[main] MQTT disabled (SIGNGUARD_DISABLE_MQTT) — API-only mode")
+        return
     orch = Orchestrator(host=_MQTT_HOST, port=_MQTT_PORT, on_analysis=_on_analysis)
     _demo["orchestrator"] = orch
     _demo["broker"] = orch.start_background()
@@ -183,6 +188,12 @@ def chain_verify() -> dict:
     """Recompute the whole chain: proves no authorization was tampered with."""
     ok, msg = registry.ledger.verify_chain()
     return {"valid": ok, "message": msg, "blocks": len(registry.ledger.blocks())}
+
+
+@app.get("/chain/view", response_class=HTMLResponse)
+def chain_view_page() -> str:
+    """Visual block explorer for the signed, hash-linked authorization ledger."""
+    return chain_view.render()
 
 
 # --------------------------------------------------------------------------- #

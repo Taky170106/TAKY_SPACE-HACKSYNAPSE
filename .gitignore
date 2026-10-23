@@ -7,6 +7,8 @@ env/
 brag-output/
 data/*.db
 data/*.sqlite*
+# Runtime device cache written by usb_demo/laptop/board_watcher.py
+data/board_state.json
 *.img
 .DS_Store
 Thumbs.db
@@ -14,3 +16,12 @@ Thumbs.db
 usb_demo/esp8266/config.py
 usb_demo/esp32/config.py
 edge_node/hardware/esp32/config.py
+# Authority signing key + the runtime ledger it produces — never commit.
+data/keys/
+data/chain/
+# Tooling / build output
+.vercel/
+node_modules/
+.pytest_cache/
+truffle/build/
+chain_eth/node_modules/

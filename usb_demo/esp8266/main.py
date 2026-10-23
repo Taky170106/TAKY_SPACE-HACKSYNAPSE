@@ -71,13 +71,16 @@ BUTTON_CYCLE = ["render", "safe_fallback", "isolate"]
 mode = "render"
 mode_since = time.ticks_ms()
 cur_lines = STATES["render"]
+content_lines = STATES["render"]  # the ACTUAL bus content to show after the banner
 good_lines = STATES["render"]     # last VERIFIED content, used for fast fallback
+banner_done = False               # have we switched from banner -> content yet?
 online = False
 client = None
 
 # Timing for the tamper alarm (ms)
 BUZZ_MS = 1200        # buzzer sounds for ~1.2 seconds
-TAMPER_SHOW_MS = 1500 # show "TAMPER DETECTED" briefly, then fall back to content
+TAMPER_SHOW_MS = 2500 # show "TAMPER DETECTED" briefly, then fall back to content
+SECURE_BANNER_MS = 1500  # show "SYSTEM SECURE" then reveal the original content
 
 # helper lists (support old single-value configs too)
 NETWORKS = getattr(cfg, "WIFI_NETWORKS", None) or [(cfg.WIFI_SSID, cfg.WIFI_PASS)]
@@ -97,17 +100,23 @@ def lcd_show(line1, line2):
 
 
 def set_mode(m, l1=None, l2=None):
-    global mode, mode_since, cur_lines, good_lines
-    lines = (l1, l2 or "") if l1 is not None else STATES.get(m, ("SIGNGUARD", m))
-    # remember the last VERIFIED content so a tamper can fall back to it fast
+    global mode, mode_since, cur_lines, good_lines, content_lines, banner_done
     if m == "render":
-        good_lines = lines
-    if m != mode or lines != cur_lines:
-        mode = m
-        cur_lines = lines
-        mode_since = time.ticks_ms()
-        lcd_show(lines[0], lines[1])
-        print("[esp8266] mode:", m)
+        # render = show "SYSTEM SECURE / Content verified" banner, then the
+        # real content. Remember the content for the banner->content reveal and
+        # for a tamper fast-fallback.
+        if l1 is not None:
+            content_lines = (l1, l2 or "")
+        good_lines = content_lines
+        lines = STATES["render"]        # banner first
+        banner_done = False
+    else:
+        lines = (l1, l2 or "") if l1 is not None else STATES.get(m, ("SIGNGUARD", m))
+    mode = m
+    cur_lines = lines
+    mode_since = time.ticks_ms()
+    lcd_show(lines[0], lines[1])
+    print("[esp8266] mode:", m)
 
 
 def on_command(topic, msg):
@@ -128,6 +137,12 @@ def update_actuators():
         led_green.value(1)
         led_red.value(0)
         buz(False)
+        # after the SECURE banner, reveal the actual original content once
+        global banner_done, cur_lines
+        if not banner_done and t > SECURE_BANNER_MS:
+            banner_done = True
+            cur_lines = content_lines
+            lcd_show(content_lines[0], content_lines[1])
     elif mode == "safe_fallback":
         led_green.value(0)
         blink = (t % 400) < 200

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 60,
+      "memory": 3008
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }
+  ],
+  "env": {
+    "SIGNGUARD_AUDIT_DB": "/tmp/signguard-audit.db",
+    "SIGNGUARD_CHAIN_PATH": "/tmp/signguard-ledger.json",
+    "SIGNGUARD_KEY_DIR": "/tmp/signguard-keys",
+    "SIGNGUARD_DISABLE_MQTT": "1"
+  }
+}

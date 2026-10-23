@@ -14,7 +14,11 @@ from app.xai import ShapExplainer
 # Signed + on-chain registry: every authorization is Ed25519-signed by the
 # authority and appended to a tamper-evident hash-linked ledger
 # (data/chain/ledger.json). Drop-in for the old LocalRegistry (same interface).
-registry = ChainRegistry()
+# Both locations are overridable because serverless hosts (Vercel) mount a
+# read-only filesystem and only allow writes under /tmp.
+_CHAIN_PATH = os.environ.get("SIGNGUARD_CHAIN_PATH", "data/chain/ledger.json")
+_KEY_DIR = os.environ.get("SIGNGUARD_KEY_DIR", "data/keys")
+registry = ChainRegistry(ledger_path=_CHAIN_PATH, key_dir=_KEY_DIR)
 
 # Append-only audit trail. Set SIGNGUARD_AUDIT_DB to persist to a file; defaults
 # to its own in-memory DB so it never shares a connection with the registry.

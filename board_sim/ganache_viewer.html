@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ganache Explorer — SignGuard SignageRegistry</title>
+<style>
+:root{--bg:#0a0e14;--panel:#111826;--acc:#f6a623;--green:#1ee69c;--txt:#e6edf3;--mute:#8aa0b6;--line:#23303f;}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:"Segoe UI",system-ui,sans-serif;padding:18px}
+h1{margin:0;font-size:21px;color:var(--acc)}
+.sub{color:var(--mute);font-size:13px;margin:2px 0 14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.card h2{margin:0 0 8px;font-size:14px;color:var(--green)}
+.stat{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px}
+.stat .b{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 16px}
+.stat .n{font-size:22px;font-weight:700;color:var(--acc)} .stat .l{font-size:11px;color:var(--mute)}
+.badge{padding:4px 10px;border-radius:6px;font-weight:700;font-size:12px;border:2px solid var(--green);color:var(--green)}
+.badge.bad{border-color:#ff5a5a;color:#ff5a5a}
+table{width:100%;border-collapse:collapse;font-size:12px;font-family:Consolas,monospace}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left}
+th{color:var(--mute);font-weight:600}
+.mono{font-family:Consolas,monospace}
+.tag{font-size:10px;padding:1px 6px;border-radius:8px;border:1px solid var(--acc);color:var(--acc)}
+.tag.call{border-color:var(--green);color:var(--green)}
+.hash{color:#7fb2ff}
+.scroll{max-height:340px;overflow:auto}
+</style></head>
+<body>
+<h1>⛓ Ganache Explorer</h1>
+<div class="sub">Live view of the local EVM at <span class="mono">http://localhost:8545</span> — where SignGuard's SignageRegistry smart contract runs. Auto-refresh 4s.</div>
+<div class="stat">
+  <div class="b"><div class="n" id="status">…</div><div class="l">RPC connection</div></div>
+  <div class="b"><div class="n" id="height">—</div><div class="l">block height</div></div>
+  <div class="b"><div class="n" id="txcount">—</div><div class="l">transactions</div></div>
+  <div class="b"><div class="n" id="contract" style="font-size:13px">—</div><div class="l">SignageRegistry address</div></div>
+</div>
+<div class="grid">
+  <div class="card"><h2>Blocks (newest first)</h2><div class="scroll"><table id="blocks"><tr><th>#</th><th>hash</th><th>txs</th><th>time</th></tr></table></div></div>
+  <div class="card"><h2>Transactions</h2><div class="scroll"><table id="txs"><tr><th>type</th><th>hash</th><th>from → to</th><th>blk</th></tr></table></div></div>
+</div>
+<div class="card" style="margin-top:14px"><h2>Accounts</h2><div class="scroll"><table id="accts"><tr><th>#</th><th>address</th><th>balance (ETH)</th></tr></table></div></div>
+
+<script>
+// Auto-detect: Ganache GUI app (7545) first, then CLI (8545).
+const RPCS=["http://localhost:7545","http://localhost:8545"];
+let RPC=RPCS[1], rid=1;
+async function pick(){
+  for(const u of RPCS){ try{
+    const r=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({jsonrpc:"2.0",id:0,method:"eth_blockNumber",params:[]})});
+    if(r.ok){ RPC=u; return; }
+  }catch(e){} }
+}
+async function rpc(method,params=[]){
+  const r=await fetch(RPC,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({jsonrpc:"2.0",id:rid++,method,params})});
+  return (await r.json()).result;
+}
+const short=(h,n=14)=>h?(h.length>n?h.slice(0,n)+"…"+h.slice(-6):h):"—";
+const hx=n=>"0x"+n.toString(16);
+async function load(){
+  try{
+    const bn=parseInt(await rpc("eth_blockNumber"),16);
+    document.getElementById("status").textContent="● online";
+    document.getElementById("status").style.color="#1ee69c";
+    document.getElementById("height").textContent=bn;
+    // accounts
+    const accts=await rpc("eth_accounts");
+    let at="<tr><th>#</th><th>address</th><th>balance (ETH)</th></tr>";
+    for(let i=0;i<accts.length;i++){
+      const bal=parseInt(await rpc("eth_getBalance",[accts[i],"latest"]),16)/1e18;
+      at+=`<tr><td>${i}</td><td class="hash">${accts[i]}</td><td>${bal.toFixed(3)}</td></tr>`;
+    }
+    document.getElementById("accts").innerHTML=at;
+    // blocks + txs
+    let bt="<tr><th>#</th><th>hash</th><th>txs</th><th>time</th></tr>";
+    let tt="<tr><th>type</th><th>hash</th><th>from → to</th><th>blk</th></tr>";
+    let total=0, contract="—";
+    for(let n=bn;n>=0 && n>bn-25;n--){
+      const b=await rpc("eth_getBlockByNumber",[hx(n),true]);
+      if(!b)continue;
+      const t=new Date(parseInt(b.timestamp,16)*1000).toLocaleTimeString();
+      bt+=`<tr><td>${n}</td><td class="hash">${short(b.hash)}</td><td>${b.transactions.length}</td><td>${t}</td></tr>`;
+      for(const tx of b.transactions){
+        total++;
+        const isCreate=!tx.to;
+        let type=isCreate?'<span class="tag">deploy</span>':'<span class="tag call">call</span>';
+        let toShow=tx.to?short(tx.to):"(contract creation)";
+        if(isCreate){const rc=await rpc("eth_getTransactionReceipt",[tx.hash]);
+          if(rc&&rc.contractAddress){contract=rc.contractAddress;toShow="→ "+short(rc.contractAddress);}}
+        tt+=`<tr><td>${type}</td><td class="hash">${short(tx.hash)}</td><td class="mono">${short(tx.from)} → ${toShow}</td><td>${parseInt(tx.blockNumber,16)}</td></tr>`;
+      }
+    }
+    document.getElementById("blocks").innerHTML=bt;
+    document.getElementById("txs").innerHTML=tt;
+    document.getElementById("txcount").textContent=total+ (bn>25?"+":"");
+    document.getElementById("contract").textContent=short(contract,18);
+  }catch(e){
+    document.getElementById("status").textContent="● offline";
+    document.getElementById("status").style.color="#ff5a5a";
+    document.getElementById("txs").innerHTML='<tr><td>Ganache not reachable at localhost:8545. Start it: <b>ganache -p 8545</b></td></tr>';
+  }
+}
+(async()=>{await pick();load();})(); setInterval(async()=>{await pick();load();},4000);
+</script>
+</body></html>
