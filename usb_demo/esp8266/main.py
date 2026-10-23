@@ -154,7 +154,9 @@ def update_actuators():
     elif mode == "isolate":
         led_green.value(0)
         led_red.value(1)
-        buz((t % 1200) < 800)
+        # beep only for the first BUZZ_MS — never buzz forever, even if no
+        # further command ever arrives (broker down for hours).
+        buz((t % 1200) < 800 if t < BUZZ_MS else False)
     elif mode == "unverified":
         led_green.value(0)
         led_red.value(0)
@@ -225,6 +227,7 @@ def main():
     lcd_show("SignGuard", "starting...")
     # one quick attempt so we usually come up LIVE
     online = try_go_online()
+    offline_since = 0 if online else time.ticks_ms()
     if online:
         set_mode("render")
         print("[esp8266] READY (LIVE). waiting for commands.")
@@ -246,6 +249,7 @@ def main():
             except OSError as e:
                 print("[esp8266] MQTT lost:", e)
                 online = False
+                offline_since = time.ticks_ms()
                 try:
                     client.disconnect()
                 except Exception:
@@ -256,7 +260,15 @@ def main():
                 last_try = time.ticks_ms()
                 if try_go_online():
                     online = True
-                    set_mode(mode)          # re-render current state on the LCD
+                    # Reconnecting after a long outage (laptop slept, broker was
+                    # down): replaying the old alarm would re-trigger the TAMPER
+                    # test + buzzer the moment MQTT comes back. Resume normal
+                    # showing instead; a new attack command re-arms the alarm.
+                    was_offline_for = time.ticks_diff(time.ticks_ms(), offline_since)
+                    if was_offline_for > 5 * 60 * 1000 and mode != "render":
+                        set_mode("render")
+                    else:
+                        set_mode(mode)  # re-render current state on the LCD
                     print("[esp8266] reconnected -> LIVE")
             # optional hands-free demo when offline
             if AUTO_DEMO and time.ticks_diff(time.ticks_ms(), auto_last) > 4000:

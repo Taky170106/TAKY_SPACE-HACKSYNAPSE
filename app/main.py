@@ -12,6 +12,8 @@ from __future__ import annotations
 import asyncio
 import base64
 import os
+import threading
+import time
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
@@ -82,9 +84,47 @@ def _on_analysis(device_id: str, result: AnalyzeResponse) -> None:
     """Orchestrator hook (runs on paho's thread) -> broadcast to browsers."""
     scenario = _demo["active"].get(device_id)
     payload = build_decision_payload(device_id, result, scenario)
+    # Decisions reaching the orchestrator by definition went through the broker,
+    # so the hardware is listening — without this the lab shows "not connected".
+    payload["hardware_notified"] = bool(_demo["broker"])
     loop = _demo["loop"]
     if loop is not None:
         asyncio.run_coroutine_threadsafe(manager.broadcast(payload), loop)
+
+
+def _broadcast_status() -> None:
+    loop = _demo["loop"]
+    if loop is not None:
+        asyncio.run_coroutine_threadsafe(
+            manager.broadcast({"type": "status", "broker": _demo["broker"]}), loop
+        )
+
+
+def _broker_watch(orch: Orchestrator, interval: float = 5.0) -> None:
+    """Runs on its own thread: keeps the broker flag honest and re-races it.
+
+    A laptop that sleeps (or a Mosquitto restarted mid-demo) must NOT leave
+    the dashboard stuck on "live triggers disabled" — the moment the broker is
+    reachable again every open page is told and the boards are disarmed.
+    Safe to re-call start_background because it tears the previous client down
+    first; two clients sharing this MQTT id would fight and spam on_connect.
+    """
+    connected = _demo["broker"]
+    while True:
+        time.sleep(interval)
+        now = orch._client is not None and orch._client.is_connected()
+        if now == connected:
+            continue
+        connected = now
+        _demo["broker"] = now
+        _broadcast_status()
+        if now:
+            continue
+        if orch.start_background(retries=20, delay=interval):
+            _demo["broker"] = True
+            connected = True
+            print("[main] broker back — live triggers re-enabled")
+            _broadcast_status()
 
 
 @app.on_event("startup")
@@ -102,7 +142,10 @@ async def _start_orchestrator() -> None:
     if _demo["broker"]:
         print("[main] orchestrator connected to broker — live demo ready")
     else:
-        print("[main] broker unreachable — dashboard loads, live triggers disabled")
+        print("[main] broker unreachable — dashboard loads, retrying in background")
+    threading.Thread(
+        target=_broker_watch, args=(orch,), daemon=True, name="broker-watch"
+    ).start()
 
 
 @app.on_event("shutdown")
@@ -303,6 +346,7 @@ async def trigger_attack(
             )
             hardware = True
 
+    payload["hardware_notified"] = hardware
     await manager.broadcast(payload)
 
     return {
@@ -353,6 +397,7 @@ async def ingest_usb(req: UsbIngestRequest) -> dict:
             orch.publish_command(req.device_id, "unverified",
                                  line1=a1[:16], line2=a2[:16])
             hw_off = True
+        payload["hardware_notified"] = hw_off
         await manager.broadcast(payload)
         return {"device_id": req.device_id, "protected": False, "verified": None,
                 "decision": "displayed", "recommended_action": "unverified",
@@ -386,6 +431,7 @@ async def ingest_usb(req: UsbIngestRequest) -> dict:
                                  attack="USB TAMPER")
         hardware = True
 
+    payload["hardware_notified"] = hardware
     await manager.broadcast(payload)
     return {
         "device_id": req.device_id, "protected": True,
@@ -482,6 +528,7 @@ async def demo_publish(req: PublishRequest) -> dict:
             )
             hardware = True
 
+    payload["hardware_notified"] = hardware
     await manager.broadcast(payload)
     return {
         "protected": req.protected,

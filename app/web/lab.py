@@ -211,12 +211,25 @@ function onDecision(p){
   }
 }
 
+function setBroker(on){
+  $("hw").textContent="● hardware: "+(on?"broker connected — board armed":"broker/ESP not connected");
+  $("hw").style.color=on?"#00ff9c":"#a95";
+  if(on&&!BROKER){ // broker just came back after an outage: clear the last test
+    setCmd("render","#00ff9c"); lcdShow(AUTH); $("buzTxt").textContent="off";
+    pill($("pIntegrity"),"PASS","green"); pill($("pAction"),"RENDER","green");
+    pill($("pFb"),"FALLBACK —"); pill($("pRisk"),"RISK 0");
+  }
+  BROKER=on;
+}
+var BROKER=false;
+
 function connect(){
   const ws=new WebSocket((location.protocol==="https:"?"wss":"ws")+"://"+location.host+"/ws");
   ws.onmessage=e=>{const p=JSON.parse(e.data);
-    if(p.type==="authorized"){AUTH=p.authentic_text; $("authTxt").textContent=(p.authentic_text||"").replace(/\|/g," | ");}
+    if(p.type==="status"){BROKER=p.broker; setBroker(p.broker);}
+    else if(p.type==="authorized"){AUTH=p.authentic_text; $("authTxt").textContent=(p.authentic_text||"").replace(/\|/g," | ");}
     else if(p.type==="decision") onDecision(p);};
-  ws.onclose=()=>setTimeout(connect,1500);
+  ws.onclose=()=>{BROKER=false; setTimeout(connect,1500);};
 }
 connect();
 </script>

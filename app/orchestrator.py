@@ -32,6 +32,7 @@ except Exception:  # noqa: BLE001 - best-effort
 
 from app.authorization import authorize_content
 from app.deps import registry
+from app.features import WINDOW_SECONDS
 from app.ingestion import EventStore
 from app.pipeline import run_analysis
 from app.schemas import AnalyzeRequest, Command, CommandType, ContentUpdate, SecurityEvent
@@ -46,8 +47,11 @@ TOPIC_COMMANDS = "signguard/commands"
 from app.demo_scenarios import AUTHENTIC as DEMO_BASELINE_CONTENT
 from app.demo_scenarios import BASELINE_CONTENT_ID as DEMO_BASELINE_CONTENT_ID
 
-# How far back to look for a device's events when scoring (matches Track B window).
-WINDOW_SECONDS = 24 * 3600
+# WINDOW_SECONDS is NOT defined here on purpose — it is imported from
+# app.features, which owns Track B's real 5-minute window. Widening it would be
+# a correctness bug, not a tuning choice: scoring a whole day of history means
+# one attack from hours earlier keeps every later decision at elevated risk, so
+# a board can never drop its alarm on its own after a long outage.
 
 
 class Orchestrator:
@@ -63,6 +67,8 @@ class Orchestrator:
         self._last_command: dict[str, str] = {}
         self._last_content: dict[str, ContentUpdate] = {}
         self._client = None
+        self._ever_connected = False
+        self._alarm_active = False
         # Optional callback fired for EVERY analysis: on_analysis(device_id, result).
         # Used by the web dashboard to push live updates; hardware command publishing
         # below stays deduped so the signage isn't spammed.
@@ -73,6 +79,22 @@ class Orchestrator:
         client.subscribe(TOPIC_EVENTS, qos=1)
         client.subscribe(TOPIC_CONTENT, qos=1)
         print(f"[orchestrator] subscribed to {TOPIC_EVENTS} + {TOPIC_CONTENT}")
+        # A board can be left sitting in an alarm when the link drops (laptop
+        # slept, broker or this server was restarted). Send the real authorized
+        # content to every node so the buzzer/LCD auto-return to normal without
+        # anyone touching the dashboard.
+        #
+        # Disarm on the FIRST connect of this process too, not only on a reconnect:
+        # that is exactly the "shut everything down, come back hours later, run
+        # the project again" case, where the broker stayed up but this server did
+        # not. Without it the board keeps showing the last alarm indefinitely.
+        if not self._ever_connected or self._alarm_active:
+            l1, _, l2 = DEMO_BASELINE_CONTENT.decode(
+                "utf-8", "replace").replace("\n", "|").partition("|")
+            self._publish_command("all", CommandType.render, line1=l1[:16], line2=l2[:16])
+            print("[orchestrator] startup/reconnect -> disarm command sent to all boards")
+        self._last_command.clear()
+        self._ever_connected = True
 
     def _on_message(self, client, userdata, msg) -> None:
         if msg.topic == TOPIC_EVENTS:
@@ -139,6 +161,9 @@ class Orchestrator:
         line1: str | None = None, line2: str | None = None,
     ) -> None:
         cmd = Command(device_id=device_id, command=command)
+        # Track the last state seen by the boards so a reconnect can auto-disarm
+        # an alarm that was still running when the link dropped.
+        self._alarm_active = command in (CommandType.safe_fallback, CommandType.isolate)
         # Keep the frozen Command fields; add optional extras on the wire so the
         # ESP LCD can show the attack label and the real content lines.
         payload = json.loads(cmd.model_dump_json())
@@ -185,9 +210,20 @@ class Orchestrator:
 
         Retries so it survives a broker that is still coming up. Returns True on
         success, False if the broker never became reachable.
+
+        Any previous client is torn down first: two clients sharing the
+        "layer2-orchestrator" id make the broker keep kicking one off, and that
+        reconnect war re-fires on_connect (and its disarm command) repeatedly.
         """
         import time
 
+        old = self._client
+        if old is not None:
+            try:
+                old.loop_stop()
+                old.disconnect()
+            except Exception:  # noqa: BLE001 - best effort cleanup
+                pass
         self._client = self._build_client()
         for attempt in range(1, retries + 1):
             try:
